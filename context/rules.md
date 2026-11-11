@@ -1,0 +1,62 @@
+# Discipline Rules
+
+The point of this project is building the muscle (money modeling, invariants, append-only history, concurrency), not shipping a product. AI shortcuts that skip the muscle defeat the project.
+
+## AI collaboration mode (read me first if you're an AI)
+
+The user is building ledger and systems muscle by hand-writing the substance of this codebase. Default behavior for any AI assistant in this repo:
+
+- **Do not write code** in `.rs` files. The user writes by hand. Context files (`context/*.md`), `.gitignore`, and the like are fair game; source is not.
+- **Do not hand over straight answers** for design or implementation questions. Guide with questions and trade-offs.
+- Lead with questions, not solutions. When the user is stuck, ask the question that surfaces the missing concept. Reveal answers only if asked directly *after* they've tried.
+- **Point at the plan** (`plan.md`) and the decisions in `progress.md` when a decision has already been made. Don't re-litigate.
+- Review what they wrote; let them fix. When the user shows code, name the gap concisely. Don't write the fix.
+- Affirm correctness when it's right. Validating good judgment matters as much as catching mistakes. Silence after a correct call reads as doubt and pushes the user into churn they didn't need.
+- Keep responses tight. No answer dumps, no comprehensive reviews unless explicitly asked. Surface one or two load-bearing things at a time.
+- Don't lead the design. When the user proposes a path, push on it with questions; don't substitute your preferred shape.
+- Don't skip phases. If the user reaches for a P6 field while doing P1, ask whether P1 needs it yet.
+
+If the user explicitly asks you to write code or hand over an answer, do it. They have agency. The default is educational, that's all.
+
+## Write by hand
+
+- Every domain type: amounts, accounts, entries, transactions
+- The posting path, start to finish
+- Every invariant check (balanced, same currency, no overflow, no edits)
+- Balance derivation and reconciliation
+- The log format, writer and replay
+- The first version of every test
+
+## Lean on AI for
+
+- `Cargo.toml` dependency and lint setup
+- Test scaffolding (after you've written one test by hand)
+- README skeletons
+- Explaining a concept you don't understand (normal balances, holds, idempotency keys)
+- Debugging help *after* you've read the compiler error yourself
+
+## When you hit a compiler error
+
+Read it. Then read it again. Then try to fix it. Then ask AI. Compiler errors are the fastest Rust teacher and you don't get that lesson if AI fixes it for you.
+
+## Ledger rules (true from P1 on, never relaxed)
+
+- Money is an integer count of minor units. No floats anywhere, not even in a test.
+- Every arithmetic step on money is checked. Overflow is an error the caller sees, never a wrap.
+- A transaction's debits equal its credits, per currency, or nothing from it is written.
+- History is append-only. There is no update or delete, only a new transaction that reverses an old one.
+- A balance can always be rebuilt from the entries. A stored balance is a cache, and it has to agree with the rebuild.
+
+## Commit guidelines
+
+See [commit_guidelines.md](commit_guidelines.md).
+
+## Comments
+
+A comment says what the code does, in the present tense, and only when the code does not say it itself. No history, no "without this", no restating the name. See [comment_guidelines.md](comment_guidelines.md).
+
+## Tests
+
+- Write the test for a feature *after* the feature works manually, by hand, no AI
+- After the first hand-written test, AI can scaffold sibling tests
+- Every invariant gets a test that tries to break it: an unbalanced transaction, a currency mix, an overflow, a replayed idempotency key
