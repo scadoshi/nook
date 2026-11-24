@@ -24,6 +24,8 @@ Done when: you can post, read a balance, and you've noticed what's wrong with it
 
 Questions: Why is "balance is derived, not stored" already the right call, even here? What would you lose by storing a running total instead?
 
+Keeping a stored balance up to date with a running history is error prone might as well just keep an append only log of the history and calculate it every time since summing is cheap
+
 ## P1: Double entry: a transaction balances or doesn't happen
 
 A transaction is a group of entries posted together, and its debits must equal its credits. `transfer alice bob 100` writes two entries: a debit on one account, a credit on the other.
