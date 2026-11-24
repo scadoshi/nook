@@ -1,3 +1,4 @@
+mod command;
 
 use std::process::ExitCode;
 
