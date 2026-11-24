@@ -3,5 +3,13 @@ name = "nook"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "nook"
+path = "src/lib/lib.rs"
+
+[[bin]]
+name = "nook"
+path = "src/bin/main.rs"
+
 [dependencies]
 thiserror = "2.0.21"
