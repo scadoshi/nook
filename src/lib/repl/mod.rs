@@ -19,8 +19,6 @@ pub enum ReplError {
     Command(#[from] InvalidCommand),
     #[error(transparent)]
     Io(#[from] std::io::Error),
-    #[error("disconnected")]
-    Disconnected,
 }
 
 #[derive(Debug)]
@@ -67,7 +65,7 @@ impl<R: BufRead> Repl<R> {
     fn get_command(&mut self) -> Result<Command, ReplError> {
         let mut buf = String::new();
         if self.reader.read_line(&mut buf)? == 0 {
-            return Err(ReplError::Disconnected);
+            return Ok(Command::Exit);
         }
         let command: Command = buf.parse()?;
         Ok(command)
@@ -89,7 +87,7 @@ impl<R: BufRead> Repl<R> {
                     print!("\x1B[2J\x1B[1;1H");
                     std::io::stdout().flush()?;
                 }
-                Ok(Command::Exit) | Err(ReplError::Disconnected) => return Ok(()),
+                Ok(Command::Exit) => return Ok(()),
                 Err(e) => println!("{e}"),
             }
         }
