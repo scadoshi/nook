@@ -5,11 +5,7 @@ use std::io::{BufRead, Write};
 use thiserror::Error;
 
 use crate::ledger::Ledger;
-use crate::repl::command::{Command, ParseCommandError};
-
-fn indent(n: usize) {
-    print!("{}", " ".repeat(n));
-}
+use crate::repl::command::{Command, HELP, ParseCommandError};
 
 #[derive(Debug, Error)]
 pub enum ReplError {
@@ -44,34 +40,24 @@ impl<R: BufRead, W: Write> Repl<R, W> {
         Ok(command)
     }
 
+    fn indent(&mut self, n: usize) -> Result<(), std::io::Error> {
+        write!(self.writer, "{}", " ".repeat(n))?;
+        Ok(())
+    }
+
     fn print_hint(&mut self) -> Result<(), std::io::Error> {
-        let commands = [
-            Command::Help,
-            Command::Create {
-                account: String::new(),
-            },
-            Command::Post {
-                account: String::new(),
-                amount: 0,
-            },
-            Command::Balance {
-                account: String::new(),
-            },
-            Command::Exit,
-        ];
-        let longest = commands
+        let longest = HELP
             .iter()
-            .map(|c| c.help_example().len())
+            .map(|entry| entry.example.len())
             .max()
             .unwrap_or(0);
-        write!(self.writer, "commands:")?;
-        for command in commands.iter() {
-            let example = command.help_example();
-            let space = longest.abs_diff(example.len()) + 5;
-            indent(2);
-            write!(self.writer, "{}", command.help_example())?;
-            indent(space);
-            writeln!(self.writer, "{}", command.help_message())?;
+        writeln!(self.writer, "commands:")?;
+        for entry in HELP {
+            let space = longest.abs_diff(entry.example.len()).saturating_add(5);
+            self.indent(2)?;
+            write!(self.writer, "{}", entry.example)?;
+            self.indent(space)?;
+            writeln!(self.writer, "{}", entry.message)?;
         }
         Ok(())
     }
@@ -81,19 +67,29 @@ impl<R: BufRead, W: Write> Repl<R, W> {
         loop {
             match self.get_command() {
                 Ok(Command::Help) => self.print_hint()?,
-                Ok(Command::Create { account }) => match self.ledger.create(account.clone()) {
-                    Ok(()) => writeln!(self.writer, "{account} created")?,
-                    Err(e) => writeln!(self.writer, "create error: {e}")?,
-                },
-                Ok(Command::Post { account, amount }) => {
-                    let label = if amount > 1 { "dollars" } else { "dollar" };
-                    match self.ledger.post(account.clone(), amount) {
-                        Ok(()) => writeln!(self.writer, "posted {amount} {label} to {account}")?,
+                Ok(Command::Create { account_name }) => {
+                    match self.ledger.create(account_name.clone()) {
+                        Ok(()) => writeln!(self.writer, "{} created", &*account_name)?,
+                        Err(e) => writeln!(self.writer, "create error: {e}")?,
+                    }
+                }
+                Ok(Command::Post {
+                    account_name,
+                    amount,
+                }) => {
+                    let label = if amount == 1 { "dollar" } else { "dollars" };
+                    match self.ledger.post(&account_name, amount) {
+                        Ok(()) => {
+                            writeln!(self.writer, "posted {amount} {label} to {}", &*account_name)?;
+                        }
                         Err(e) => writeln!(self.writer, "post error: {e}")?,
                     }
                 }
-                Ok(Command::Balance { account }) => match self.ledger.balance(account.clone()) {
-                    Ok(balance) => writeln!(self.writer, "{account} has {balance} dollars")?,
+                Ok(Command::Balance { account_name }) => match self.ledger.balance(&account_name) {
+                    Ok(balance) => {
+                        let label = if balance == 1 { "dollar" } else { "dollars" };
+                        writeln!(self.writer, "{} has {balance} {label}", &*account_name)?;
+                    }
                     Err(e) => writeln!(self.writer, "balance error: {e}")?,
                 },
                 Ok(Command::Exit) => return Ok(()),

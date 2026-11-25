@@ -3,6 +3,8 @@ use std::str::FromStr;
 
 use thiserror::Error;
 
+use crate::ledger::account_name::{AccountName, ParseAccountNameError};
+
 #[derive(Debug, Clone, Error, PartialEq)]
 pub enum ParseCommandError {
     #[error("input was empty")]
@@ -15,38 +17,57 @@ pub enum ParseCommandError {
     TooManyArguments,
     #[error("couldn't parse argument: {0} into int: {1}")]
     ArgParseInt(&'static str, ParseIntError),
+    #[error(transparent)]
+    ParseAccountName(#[from] ParseAccountNameError),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
     Help,
-    Create { account: String },
-    Post { account: String, amount: i32 },
-    Balance { account: String },
+    Create {
+        account_name: AccountName,
+    },
+    Post {
+        account_name: AccountName,
+        amount: i32,
+    },
+    Balance {
+        account_name: AccountName,
+    },
     Exit,
 }
 
-impl Command {
-    pub fn help_example(&self) -> &'static str {
-        match self {
-            Self::Help => "help",
-            Self::Create { .. } => "create <account>",
-            Self::Post { .. } => "post <account> <amount>",
-            Self::Balance { .. } => "balance <account>",
-            Self::Exit => "exit",
-        }
-    }
-
-    pub fn help_message(&self) -> &'static str {
-        match self {
-            Self::Help => "show this message",
-            Self::Create { .. } => "create a new account",
-            Self::Post { .. } => "add an amount to an account",
-            Self::Balance { .. } => "show an account's balance",
-            Self::Exit => "quit",
-        }
-    }
+/// One line of the help text: how to type a command, and what it does.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct HelpEntry {
+    pub(crate) example: &'static str,
+    pub(crate) message: &'static str,
 }
+
+/// Every command's help line, in the order help prints them. Add a row when
+/// you add a `Command` variant; nothing checks that the two stay in step.
+pub(crate) const HELP: [HelpEntry; 5] = [
+    HelpEntry {
+        example: "help",
+        message: "show this message",
+    },
+    HelpEntry {
+        example: "create <account name>",
+        message: "create a new account",
+    },
+    HelpEntry {
+        example: "post <account name> <amount>",
+        message: "add an amount to an account",
+    },
+    HelpEntry {
+        example: "balance <account name>",
+        message: "show an account's balance",
+    },
+    HelpEntry {
+        example: "exit",
+        message: "quit",
+    },
+];
 
 impl FromStr for Command {
     type Err = ParseCommandError;
@@ -64,37 +85,49 @@ impl FromStr for Command {
                 Self::Help
             }
             "create" => {
-                let Some(account) = parts.next().map(String::from) else {
-                    return Err(ParseCommandError::MissingArg("account".into()));
-                };
+                let account_name = parts
+                    .next()
+                    .ok_or_else(|| ParseCommandError::MissingArg("account".into()))
+                    .map(AccountName::from_str)??;
                 if parts.next().is_some() {
                     return Err(ParseCommandError::TooManyArguments);
                 }
-                Self::Create { account }
+                Self::Create { account_name }
             }
             "post" => {
-                let Some(account) = parts.next().map(String::from) else {
-                    return Err(ParseCommandError::MissingArg("account".into()));
-                };
-                let Some(amount) = parts.next() else {
-                    return Err(ParseCommandError::MissingArg("amount".into()));
-                };
+                let account_name = parts
+                    .next()
+                    .ok_or_else(|| ParseCommandError::MissingArg("account".into()))
+                    .map(AccountName::from_str)??;
+                let amount: i32 = parts
+                    .next()
+                    .ok_or_else(|| ParseCommandError::MissingArg("amount".into()))?
+                    .parse()
+                    .map_err(|e| ParseCommandError::ArgParseInt("amount", e))?;
                 if parts.next().is_some() {
                     return Err(ParseCommandError::TooManyArguments);
                 }
-                let amount: i32 = match amount.parse() {
-                    Ok(a) => a,
-                    Err(e) => return Err(ParseCommandError::ArgParseInt("amount", e)),
-                };
-                Self::Post { amount, account }
+                Self::Post {
+                    account_name,
+                    amount,
+                }
             }
             "balance" => {
-                let Some(account) = parts.next().map(String::from) else {
-                    return Err(ParseCommandError::MissingArg("account".into()));
-                };
-                Self::Balance { account }
+                let account_name = parts
+                    .next()
+                    .ok_or_else(|| ParseCommandError::MissingArg("account".into()))
+                    .map(AccountName::from_str)??;
+                if parts.next().is_some() {
+                    return Err(ParseCommandError::TooManyArguments);
+                }
+                Self::Balance { account_name }
             }
-            "exit" => Self::Exit,
+            "exit" => {
+                if parts.next().is_some() {
+                    return Err(ParseCommandError::TooManyArguments);
+                }
+                Self::Exit
+            }
             x => return Err(ParseCommandError::Unrecognized(x.into())),
         })
     }
@@ -103,6 +136,7 @@ impl FromStr for Command {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::account_name;
 
     #[test]
     fn parse_help_command() {
@@ -118,13 +152,12 @@ mod tests {
 
     #[test]
     fn parse_create() {
-        let account = "foo";
         let expected = Command::Create {
-            account: account.into(),
+            account_name: account_name(),
         };
         let cases = ["create", "CREATE", "CrEaTe"]
             .into_iter()
-            .map(|s| format!("{s} {account}"));
+            .map(|s| format!("{s} {}", &*account_name()));
         for str in cases {
             let command: Command = str.parse().unwrap();
             assert_eq!(command, expected, "input = {str:?}");
@@ -133,15 +166,14 @@ mod tests {
 
     #[test]
     fn parse_post() {
-        let account = "foo";
         let amount = 1;
         let expected = Command::Post {
-            account: account.into(),
+            account_name: account_name(),
             amount,
         };
         let cases = ["post", "POST", "PoSt"]
             .into_iter()
-            .map(|s| format!("{s} {account} {amount}"));
+            .map(|s| format!("{s} {} {amount}", &*account_name()));
         for str in cases {
             let command: Command = str.parse().unwrap();
             assert_eq!(command, expected, "input = {str:?}");
@@ -150,13 +182,12 @@ mod tests {
 
     #[test]
     fn parse_balance() {
-        let account = "foo";
         let expected = Command::Balance {
-            account: account.into(),
+            account_name: account_name(),
         };
         let cases = ["balance", "BALANCE", "BaLaNcE"]
             .into_iter()
-            .map(|s| format!("{s} {account}"));
+            .map(|s| format!("{s} {}", &*account_name()));
         for str in cases {
             let command: Command = str.parse().unwrap();
             assert_eq!(command, expected, "input = {str:?}");
@@ -210,28 +241,53 @@ mod tests {
         }
     }
 
-    /// Table: "", "   ", "\n" all return Empty.
     #[test]
-    #[ignore = "stub, not written yet"]
-    fn empty_input() {}
+    fn empty_input() {
+        let cases = vec!["", " ", "\n"];
+        for str in cases {
+            assert_eq!(
+                str.parse::<Command>().unwrap_err(),
+                ParseCommandError::Empty,
+                "input = {str:?}"
+            );
+        }
+    }
 
-    /// Table: "post foo bar" and an amount past i32::MAX both return ArgParseInt on "amount".
     #[test]
-    #[ignore = "stub, not written yet"]
-    fn arg_parse_int() {}
+    fn arg_parse_int() {
+        let cases = ["bar", "2147483648"]
+            .iter()
+            .map(|s| format!("post foo {s}"));
+        for str in cases {
+            assert!(
+                matches!(
+                    str.parse::<Command>().unwrap_err(),
+                    ParseCommandError::ArgParseInt(..)
+                ),
+                "input = {str:?}"
+            );
+        }
+    }
 
-    /// "post foo -5" parses with amount -5.
     #[test]
-    #[ignore = "stub, not written yet"]
-    fn parse_post_negative() {}
+    fn parse_post_negative() {
+        let amount = -1;
+        assert_eq!(
+            format!("post {} {}", &*account_name(), amount)
+                .parse::<Command>()
+                .unwrap(),
+            Command::Post {
+                account_name: account_name(),
+                amount,
+            }
+        );
+    }
 
-    /// "post Bob 1" keeps the account as "Bob", not "bob".
     #[test]
-    #[ignore = "stub, not written yet"]
-    fn preserves_account_case() {}
-
-    /// An unknown word returns Unrecognized.
-    #[test]
-    #[ignore = "stub, not written yet"]
-    fn unrecognized() {}
+    fn unrecognized() {
+        assert!(matches!(
+            "foo".parse::<Command>().unwrap_err(),
+            ParseCommandError::Unrecognized(..)
+        ));
+    }
 }
