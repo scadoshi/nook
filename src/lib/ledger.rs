@@ -1,8 +1,16 @@
 use std::collections::HashMap;
 
+use thiserror::Error;
+
 #[derive(Debug, Clone, Default)]
 pub struct Ledger {
     pub inner: HashMap<String, Vec<i32>>,
+}
+
+#[derive(Debug, Error)]
+pub enum PostError {
+    #[error("post would leave account's balance overflowed")]
+    WouldOverflow,
 }
 
 impl Ledger {
@@ -10,8 +18,13 @@ impl Ledger {
         Self::default()
     }
 
-    pub fn post(&mut self, account: impl Into<String>, amount: i32) {
-        self.inner.entry(account.into()).or_default().push(amount);
+    pub fn post(&mut self, account: impl Into<String>, amount: i32) -> Result<(), PostError> {
+        let account = account.into();
+        if self.balance(&account).checked_add(amount).is_none() {
+            return Err(PostError::WouldOverflow);
+        }
+        self.inner.entry(account).or_default().push(amount);
+        Ok(())
     }
 
     pub fn balance(&self, account: impl AsRef<str>) -> i32 {
