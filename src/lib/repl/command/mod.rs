@@ -9,7 +9,6 @@ pub enum Command {
     Help,
     Post { account: String, amount: i32 },
     Balance { account: String },
-    Clear,
     Exit,
 }
 
@@ -17,14 +16,14 @@ impl Command {
     pub fn account(&self) -> Option<&str> {
         match self {
             Self::Post { account, .. } | Self::Balance { account } => Some(account),
-            Self::Help | Self::Clear | Self::Exit => None,
+            Self::Help | Self::Exit => None,
         }
     }
 
     pub fn amount(&self) -> Option<i32> {
         match self {
             Self::Post { amount, .. } => Some(*amount),
-            Self::Help | Self::Balance { .. } | Self::Clear | Self::Exit => None,
+            Self::Help | Self::Balance { .. } | Self::Exit => None,
         }
     }
 
@@ -33,7 +32,6 @@ impl Command {
             Self::Help => "help",
             Self::Post { .. } => "post <account> <amount>",
             Self::Balance { .. } => "balance <account>",
-            Self::Clear => "clear",
             Self::Exit => "exit",
         }
     }
@@ -43,7 +41,6 @@ impl Command {
             Self::Help => "show this message",
             Self::Post { .. } => "add an amount to an account",
             Self::Balance { .. } => "show an account's balance",
-            Self::Clear => "clear the console",
             Self::Exit => "quit",
         }
     }
@@ -61,14 +58,14 @@ impl FromStr for Command {
             "help" => Self::Help,
             "post" => {
                 let Some(account) = parts.next().map(String::from) else {
-                    return Err(InvalidPost::MissingAccount.into());
+                    return Err(InvalidPost::MissingArg.into());
                 };
                 let Some(amount) = parts.next() else {
-                    return Err(InvalidPost::MissingAmount.into());
+                    return Err(InvalidPost::MissingArg.into());
                 };
                 let amount: i32 = match amount.parse() {
                     Ok(a) => a,
-                    Err(e) => return Err(InvalidPost::ParseAmount(e).into()),
+                    Err(e) => return Err(InvalidPost::ParseArg(e).into()),
                 };
                 Self::Post { amount, account }
             }
@@ -78,7 +75,6 @@ impl FromStr for Command {
                 };
                 Self::Balance { account }
             }
-            "clear" => Self::Clear,
             "exit" => Self::Exit,
             _ => return Err(InvalidCommand::Unrecognized),
         })
@@ -103,26 +99,22 @@ mod tests {
     }
 
     #[test]
-    fn parse_command_err_post_missing_account() {
+    fn parse_command_err_post_missing_arg() {
         assert!(matches!(
             "post".parse::<Command>(),
-            Err(InvalidCommand::Post(InvalidPost::MissingAccount))
+            Err(InvalidCommand::Post(InvalidPost::MissingArg))
         ));
-    }
-
-    #[test]
-    fn parse_command_err_post_missing_amount() {
         assert!(matches!(
             "post foo".parse::<Command>(),
-            Err(InvalidCommand::Post(InvalidPost::MissingAmount))
+            Err(InvalidCommand::Post(InvalidPost::MissingArg))
         ));
     }
 
     #[test]
-    fn parse_command_err_post_parse_amount() {
+    fn parse_command_err_post_parse_arg() {
         assert!(matches!(
             "post foo bar".parse::<Command>(),
-            Err(InvalidCommand::Post(InvalidPost::ParseAmount(_)))
+            Err(InvalidCommand::Post(InvalidPost::ParseArg(_)))
         ));
     }
 

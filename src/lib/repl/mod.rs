@@ -35,7 +35,6 @@ fn print_hint() {
             amount: 0,
         },
         Command::Balance { account: "".into() },
-        Command::Clear,
         Command::Exit,
     ];
     let longest = commands
@@ -82,10 +81,6 @@ impl<R: BufRead> Repl<R> {
                 }
                 Ok(Command::Balance { account }) => {
                     println!("{account} has {} dollars", self.ledger.balance(&account))
-                }
-                Ok(Command::Clear) => {
-                    print!("\x1B[2J\x1B[1;1H");
-                    std::io::stdout().flush()?;
                 }
                 Ok(Command::Exit) => return Ok(()),
                 Err(e) => println!("{e}"),

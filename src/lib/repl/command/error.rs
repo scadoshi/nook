@@ -3,12 +3,10 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
 pub enum InvalidPost {
-    #[error("missing account")]
-    MissingAccount,
-    #[error("missing amount")]
-    MissingAmount,
+    #[error("missing argument")]
+    MissingArg,
     #[error(transparent)]
-    ParseAmount(#[from] ParseIntError),
+    ParseArg(#[from] ParseIntError),
 }
 
 #[derive(Debug, Clone, Error)]
