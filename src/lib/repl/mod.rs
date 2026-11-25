@@ -1,6 +1,6 @@
 mod command;
 
-use std::io::{BufRead, Write};
+use std::io::BufRead;
 
 use thiserror::Error;
 
@@ -30,6 +30,7 @@ pub struct Repl<R> {
 fn print_hint() {
     let commands = [
         Command::Help,
+        Command::Create { account: "".into() },
         Command::Post {
             account: "".into(),
             amount: 0,
@@ -75,13 +76,20 @@ impl<R: BufRead> Repl<R> {
         loop {
             match self.get_command() {
                 Ok(Command::Help) => print_hint(),
+                Ok(Command::Create { account }) => match self.ledger.create(account.clone()) {
+                    Ok(()) => println!("{account} created"),
+                    Err(e) => eprintln!("error: {e}"),
+                },
                 Ok(Command::Post { account, amount }) => {
-                    self.ledger.post(account.clone(), amount);
-                    println!("posted {amount} dollars to {account}");
+                    match self.ledger.post(account.clone(), amount) {
+                        Ok(()) => println!("posted {amount} dollars to {account}"),
+                        Err(e) => eprintln!("error: {e}"),
+                    }
                 }
-                Ok(Command::Balance { account }) => {
-                    println!("{account} has {} dollars", self.ledger.balance(&account))
-                }
+                Ok(Command::Balance { account }) => match self.ledger.balance(account.clone()) {
+                    Ok(balance) => println!("{account} has {balance} dollars"),
+                    Err(e) => eprintln!("{e}"),
+                },
                 Ok(Command::Exit) => return Ok(()),
                 Err(e) => println!("{e}"),
             }

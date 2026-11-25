@@ -7,6 +7,7 @@ pub mod error;
 #[derive(Debug, Clone)]
 pub enum Command {
     Help,
+    Create { account: String },
     Post { account: String, amount: i32 },
     Balance { account: String },
     Exit,
@@ -17,7 +18,9 @@ impl Command {
     #[cfg(test)]
     pub fn account(&self) -> Option<&str> {
         match self {
-            Self::Post { account, .. } | Self::Balance { account } => Some(account),
+            Self::Create { account } | Self::Post { account, .. } | Self::Balance { account } => {
+                Some(account)
+            }
             Self::Help | Self::Exit => None,
         }
     }
@@ -27,13 +30,14 @@ impl Command {
     pub fn amount(&self) -> Option<i32> {
         match self {
             Self::Post { amount, .. } => Some(*amount),
-            Self::Help | Self::Balance { .. } | Self::Exit => None,
+            Self::Create { .. } | Self::Help | Self::Balance { .. } | Self::Exit => None,
         }
     }
 
     pub fn help_example(&self) -> &'static str {
         match self {
             Self::Help => "help",
+            Self::Create { .. } => "create <account>",
             Self::Post { .. } => "post <account> <amount>",
             Self::Balance { .. } => "balance <account>",
             Self::Exit => "exit",
@@ -43,6 +47,7 @@ impl Command {
     pub fn help_message(&self) -> &'static str {
         match self {
             Self::Help => "show this message",
+            Self::Create { .. } => "create a new account",
             Self::Post { .. } => "add an amount to an account",
             Self::Balance { .. } => "show an account's balance",
             Self::Exit => "quit",
@@ -60,6 +65,12 @@ impl FromStr for Command {
 
         Ok(match command.to_lowercase().as_ref() {
             "help" => Self::Help,
+            "create" => {
+                let Some(account) = parts.next().map(String::from) else {
+                    return Err(InvalidPost::MissingArg.into());
+                };
+                Self::Create { account }
+            }
             "post" => {
                 let Some(account) = parts.next().map(String::from) else {
                     return Err(InvalidPost::MissingArg.into());
@@ -92,6 +103,13 @@ mod tests {
     #[test]
     fn parse_command_ok_help() {
         assert!(matches!("help".parse::<Command>().unwrap(), Command::Help));
+    }
+
+    #[test]
+    fn parse_command_ok_create() {
+        let command = "create foo 1".parse::<Command>().unwrap();
+        assert!(matches!(command, Command::Create { .. }));
+        assert_eq!(command.account(), Some("foo"));
     }
 
     #[test]
