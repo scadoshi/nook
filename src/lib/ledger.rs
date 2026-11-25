@@ -4,7 +4,7 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, Default)]
 pub struct Ledger {
-    pub inner: HashMap<String, Vec<i32>>,
+    inner: HashMap<String, Vec<i32>>,
 }
 
 const ACCOUNT_NAME_MAX_LEN: usize = 64;
@@ -161,4 +161,44 @@ mod tests {
             Err(BalanceError::AccountNotFound)
         ));
     }
+
+    /// A name of exactly ACCOUNT_NAME_MAX_LEN chars is accepted (the boundary next to the existing too-long test).
+    #[test]
+    #[ignore = "stub, not written yet"]
+    fn create_allows_name_at_max_len() {}
+
+    /// "" and "   " through the Ledger API. Decide what should happen first; see the bug list.
+    #[test]
+    #[ignore = "stub, not written yet"]
+    fn create_rejects_blank_name() {}
+
+    /// Posting to one account leaves another account's balance alone.
+    #[test]
+    #[ignore = "stub, not written yet"]
+    fn accounts_are_independent() {}
+
+    /// create "Bob", then balance "bob". Pin down whichever behavior you decide on.
+    #[test]
+    #[ignore = "stub, not written yet"]
+    fn account_names_are_case_sensitive() {}
+
+    /// A negative post lowers the balance, and can take it below zero.
+    #[test]
+    #[ignore = "stub, not written yet"]
+    fn post_negative_amount() {}
+
+    /// A post past i32::MAX returns WouldOverflow.
+    #[test]
+    #[ignore = "stub, not written yet"]
+    fn post_would_overflow() {}
+
+    /// A negative post past i32::MIN also returns an error.
+    #[test]
+    #[ignore = "stub, not written yet"]
+    fn post_would_underflow() {}
+
+    /// After a WouldOverflow, the balance (and history) is what it was before.
+    #[test]
+    #[ignore = "stub, not written yet"]
+    fn post_rejected_leaves_history_unchanged() {}
 }

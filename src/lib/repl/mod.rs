@@ -1,13 +1,11 @@
 mod command;
 
-use std::io::BufRead;
+use std::io::{BufRead, Write};
 
 use thiserror::Error;
 
-use crate::{
-    ledger::Ledger,
-    repl::command::{Command, error::InvalidCommand},
-};
+use crate::ledger::Ledger;
+use crate::repl::command::{Command, ParseCommandError};
 
 fn indent(n: usize) {
     print!("{}", " ".repeat(n));
@@ -16,48 +14,23 @@ fn indent(n: usize) {
 #[derive(Debug, Error)]
 pub enum ReplError {
     #[error(transparent)]
-    Command(#[from] InvalidCommand),
+    Command(#[from] ParseCommandError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
 
 #[derive(Debug)]
-pub struct Repl<R> {
-    ledger: Ledger,
+pub struct Repl<R, W> {
     reader: R,
+    writer: W,
+    ledger: Ledger,
 }
 
-fn print_hint() {
-    let commands = [
-        Command::Help,
-        Command::Create { account: "".into() },
-        Command::Post {
-            account: "".into(),
-            amount: 0,
-        },
-        Command::Balance { account: "".into() },
-        Command::Exit,
-    ];
-    let longest = commands
-        .iter()
-        .map(|c| c.help_example().len())
-        .max()
-        .unwrap_or(0);
-    println!("commands:");
-    for command in commands.iter() {
-        let example = command.help_example();
-        let space = longest.abs_diff(example.len()) + 5;
-        indent(2);
-        print!("{}", command.help_example());
-        indent(space);
-        println!("{}", command.help_message());
-    }
-}
-
-impl<R: BufRead> Repl<R> {
-    pub fn new(reader: R) -> Self {
+impl<R: BufRead, W: Write> Repl<R, W> {
+    pub fn new(reader: R, writer: W) -> Self {
         Self {
             reader,
+            writer,
             ledger: Ledger::new(),
         }
     }
@@ -71,28 +44,107 @@ impl<R: BufRead> Repl<R> {
         Ok(command)
     }
 
+    fn print_hint(&mut self) -> Result<(), std::io::Error> {
+        let commands = [
+            Command::Help,
+            Command::Create {
+                account: String::new(),
+            },
+            Command::Post {
+                account: String::new(),
+                amount: 0,
+            },
+            Command::Balance {
+                account: String::new(),
+            },
+            Command::Exit,
+        ];
+        let longest = commands
+            .iter()
+            .map(|c| c.help_example().len())
+            .max()
+            .unwrap_or(0);
+        write!(self.writer, "commands:")?;
+        for command in commands.iter() {
+            let example = command.help_example();
+            let space = longest.abs_diff(example.len()) + 5;
+            indent(2);
+            write!(self.writer, "{}", command.help_example())?;
+            indent(space);
+            writeln!(self.writer, "{}", command.help_message())?;
+        }
+        Ok(())
+    }
+
     pub fn run(&mut self) -> Result<(), ReplError> {
-        print_hint();
+        self.print_hint()?;
         loop {
             match self.get_command() {
-                Ok(Command::Help) => print_hint(),
+                Ok(Command::Help) => self.print_hint()?,
                 Ok(Command::Create { account }) => match self.ledger.create(account.clone()) {
-                    Ok(()) => println!("{account} created"),
-                    Err(e) => eprintln!("error: {e}"),
+                    Ok(()) => writeln!(self.writer, "{account} created")?,
+                    Err(e) => writeln!(self.writer, "create error: {e}")?,
                 },
                 Ok(Command::Post { account, amount }) => {
+                    let label = if amount > 1 { "dollars" } else { "dollar" };
                     match self.ledger.post(account.clone(), amount) {
-                        Ok(()) => println!("posted {amount} dollars to {account}"),
-                        Err(e) => eprintln!("error: {e}"),
+                        Ok(()) => writeln!(self.writer, "posted {amount} {label} to {account}")?,
+                        Err(e) => writeln!(self.writer, "post error: {e}")?,
                     }
                 }
                 Ok(Command::Balance { account }) => match self.ledger.balance(account.clone()) {
-                    Ok(balance) => println!("{account} has {balance} dollars"),
-                    Err(e) => eprintln!("{e}"),
+                    Ok(balance) => writeln!(self.writer, "{account} has {balance} dollars")?,
+                    Err(e) => writeln!(self.writer, "balance error: {e}")?,
                 },
                 Ok(Command::Exit) => return Ok(()),
-                Err(e) => println!("{e}"),
+                Err(e) => writeln!(self.writer, "{e}")?,
             }
+            self.writer.flush()?;
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Input with no exit line: run returns Ok when the reader runs out.
+    #[test]
+    #[ignore = "stub, not written yet"]
+    fn run_exits_on_eof() {}
+
+    /// "exit" returns Ok, and lines after it are never processed.
+    #[test]
+    #[ignore = "stub, not written yet"]
+    fn run_exits_on_exit_command() {}
+
+    /// create, post, balance end to end; check the written output.
+    #[test]
+    #[ignore = "stub, not written yet"]
+    fn run_create_post_balance() {}
+
+    /// Output for posting 1, 2, 0 and -5. What should "dollar" vs "dollars" say for each?
+    #[test]
+    #[ignore = "stub, not written yet"]
+    fn run_post_label_singular_plural() {}
+
+    /// Balance of 1 vs 2: does the balance line pluralize the same way post does?
+    #[test]
+    #[ignore = "stub, not written yet"]
+    fn run_balance_label() {}
+
+    /// A bad line writes an error and the next good line still runs.
+    #[test]
+    #[ignore = "stub, not written yet"]
+    fn run_parse_error_continues() {}
+
+    /// Posting to a missing account writes an error and the loop keeps going.
+    #[test]
+    #[ignore = "stub, not written yet"]
+    fn run_ledger_error_continues() {}
+
+    /// "help" output (and the startup hint) shows up in the writer, not on stdout.
+    #[test]
+    #[ignore = "stub, not written yet"]
+    fn run_help_goes_to_writer() {}
 }
