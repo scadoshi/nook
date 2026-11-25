@@ -54,7 +54,7 @@ impl FromStr for Command {
             return Err(InvalidCommand::Empty);
         };
 
-        Ok(match command {
+        Ok(match command.to_lowercase().as_ref() {
             "help" => Self::Help,
             "post" => {
                 let Some(account) = parts.next().map(String::from) else {
