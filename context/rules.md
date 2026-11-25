@@ -2,6 +2,8 @@
 
 The point of this project is building the muscle (money modeling, invariants, append-only history, concurrency), not shipping a product. AI shortcuts that skip the muscle defeat the project.
 
+AI does mechanical edits I've already decided (renames, config, signature churn). Decisions are mine. When I'm tired enough to want AI to finish a part for me, I set the project down for the night instead.
+
 ## AI collaboration mode (read me first if you're an AI)
 
 The user is building ledger and systems muscle by hand-writing the substance of this codebase. Default behavior for any AI assistant in this repo:

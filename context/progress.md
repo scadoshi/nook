@@ -4,53 +4,47 @@ Where the project actually is: phase status, decisions made, gotchas surfaced, w
 
 ## Where I am
 
-**P0 working, as of 2026-11-25.** A per-account ledger (`HashMap<String, Vec<i32>>`, balance summed on every read) behind a REPL. Accounts must be created before use: `create` adds one (64-char name limit, no duplicates), and `post` and `balance` return `AccountNotFound` on a missing one (`CreateError`, `PostError`, `BalanceError` in `ledger.rs`). `post` refuses an amount that would overflow the balance. `Command` parses with `FromStr`, case-insensitive, into typed errors (`InvalidCommand`, `InvalidPost`, `InvalidBalance`). `Repl<R: BufRead>` takes its reader; end of input means exit. Commands: help, create, post, balance, exit (clear was removed). Help is aligned in two columns from `help_example` and `help_message`.
+**P0 working, as of 2026-11-25 (late).** A per-account ledger (`HashMap<AccountName, Vec<i32>>`, balance summed on every read) behind a REPL. Files: `ledger/mod.rs` (`Ledger`, `CreateError`, `PostError`, `BalanceError`) and `ledger/account_name.rs`. `AccountName` is a newtype built only through `FromStr`: it trims, lowercases, and rejects empty names, names over 64 chars, and names with inner whitespace. `Command` parses case-insensitively into one `ParseCommandError` (empty, unrecognized, missing or extra arguments, a bad int, a bad account name). `Repl<R: BufRead, W: Write>` reads and writes through injected handles; `main` passes stdin and stdout. Help comes from a `const HELP` table of `HelpEntry { example, message }`. The scadoshi-rust lints, `clippy.toml` and `rustfmt.toml` are in place.
 
-As of 2026-11-25 late: 6 commits pushed (disconnect handling through the bug-board fixes); create and the not-found errors are uncommitted on the laptop. 15 of 16 tests pass, clippy is clean.
+22 tests pass, 16 are ignored stubs (the two label stubs can be filled in now), fmt is clean. Clippy: no errors; the warnings are docs (deferred) plus the few bugs below. 
 
 **Next:**
-- Make `Repl` generic over the writer too (`W: Write`), so output is testable the way input already is, and `main` passes stdout. Right now reading is injected but printing goes straight to `println!`, which is asymmetric.
-- Write the leftover tests, including REPL-level ones through the reader/writer harness.
-- Fix the bugs below.
+- Chip away at the open bugs below.
+- Fill in the ignored stubs (`#[ignore = "stub, not written yet"]`), starting with the `Repl::run` ones now that the writer is injected.
+- Docs, once the shape settles.
 - Then P0's real question: notice what's wrong (money from nowhere, nothing says where it went) and move to P1.
 
 ## Bugs
 
 Found behavior only. The fixes are his to write.
 
-- [x] **End of input loops forever.** Pipe a few commands in, or press Ctrl-D: once `read_line` returns 0, `get_command` returns `Disconnected`, `run` prints it and loops, and it prints `disconnected` forever. Hint: which `ReplError`s should be shown to the user, and which should end `run`? An I/O error from `read_line` takes the same path.
-    - Removed disconnected as an error since it isn't. Just made read output of Ok(0) to return Command::Exit as well
-- [x] **Commands are case sensitive now.** `POST bob 3` is "unrecognized command". The first REPL lowercased its input; the `FromStr` one doesn't. Decide on purpose: commands case-insensitive, but account names?
-    - Made to be case insensitive
-- [x] **A balance can overflow.** `post a 2147483647` twice, then `balance a`: `sum()` over `i32` panics in a debug build and wraps in release. That's the P0 lesson pointing at P2 (checked math, an `Amount` type).
-    - Build a post to decline when the addition would overflow
-- [x] **Clippy:** `Command::account` and `Command::amount` are only used in tests, so they warn as dead code outside them.
-    - Ignoring them with a config tag for; now we'll use later
-- [x] **Nit, naming:** `InvalidPost::MissingAccount` and `InvalidBalance::Account` are the same failure under two names. Pick one and use it in both.
-    - Consolidated the errors into missing args
+Fixed so far: the end-of-input loop, case-sensitive commands, balance overflow, dead accessor methods, duplicate missing-account errors, the trim bug, blank names, extra arguments (now rejected), the wrong "invalid post" error on `create`, output going three ways (all through the writer now), account-name case (lowercased by `AccountName`), dollar labels on post and balance, the dead `ACCOUNT_NAME_MAX_LEN` copy, and `cannot_exceed_max` (now 63, 64 and 65).
 
-Open, found 2026-11-25 after create and not-found landed:
+Open, found 2026-11-25 after `AccountName` and the help table:
 
-- [ ] **`create_trims_account_names` fails.** `create("  foo  ")` then `balance("foo")` is `AccountNotFound`. `create` trims only for the length check; what gets stored, and what `balance` and `post` look up, is the untrimmed string. Hint: where should a name become its canonical form, once at the edge or in every method? Note the REPL can't hit this (`split_whitespace` already strips), so it's a `Ledger` API question.
-- [ ] **Blank and whitespace-only names.** `Ledger::create("")` and `create("   ")` succeed through the API. Same "where does validation live" question as above.
-- [ ] **Extra arguments are silently dropped.** `create foo 1`, `post a 1 2`, `balance a b` all parse fine, and `parse_command_ok_create` asserts on `create foo 1`. Decide on purpose: ignore, or reject with a "too many arguments" error?
-- [ ] **A missing `create` argument says "invalid post".** `create` with no name returns `InvalidPost::MissingArg`, so it prints `invalid post: missing argument`. And `balance` still has its own `InvalidBalance::Account` ("missing account"), so the naming nit is only half consolidated. This is the shared-argument-errors question from before.
-- [ ] **Output goes three different ways.** Create and post errors: `eprintln!` with `error: `. Balance errors: `eprintln!` without the prefix. Parse errors: `println!` to stdout. Settle this before the writer injection, since that's where it'll show.
-- [ ] **Account names are case sensitive, commands aren't.** `create Bob` then `balance bob` is not found. Could be right; worth writing down as a decision either way.
-- [ ] **A reader that keeps erroring loops forever.** An I/O error from `read_line` is printed and the loop reads again. Same shape as the old disconnect bug. Rare from stdin, easy to hit from a test reader.
-- [ ] **Nit:** `post` looks the account up twice (`balance`, then `get_mut`). Fine at P0. Can it be one lookup?
-- [ ] **Untested:** nothing exercises `Repl::run` yet (waits on the writer), and no test covers posting a negative amount past `i32::MIN`.
-
+- [ ] **A reader that keeps erroring loops forever.** An I/O error from `read_line` falls into the `Err(e)` arm, gets printed, and the loop reads again. Same shape as the old disconnect bug. Hint: which `ReplError` variants should `run` show and continue on, and which should end it?
+- [ ] **The missing-argument name doesn't match help.** Help says `<account name>`; the error says `missing argument: <account>`.
+- [ ] **Error messages read unevenly.** `Empty` says "account name cannot be empty", but `ExceedsMaxLength` and `IncludesWhitespace` drop the subject ("cannot exceed 64 chars"). Parse errors print bare while ledger errors get a `create error:` style prefix. A blank line prints "input was empty"; most REPLs just show the prompt again. Negative amounts read "posted -1 dollars"; fine, but decide on purpose.
+- [ ] **Clippy, small:** `get_mut(&account_name)` in `post` borrows something that's already a reference; `Command` is `pub` but never leaves the crate (`unreachable_pub` wants `pub(super)`); `main`'s `eprintln!` wants an `#[expect]` with a reason, since it's the CLI's own output.
+- [ ] **`Deref` on `AccountName`.** The guide keeps `Deref` for smart pointers. The `&*account_name` in every `writeln!` is the symptom. What would let you write `{account_name}` directly?
+- [ ] **Stale ledger stubs.** `create_allows_name_at_max_len`, `create_rejects_blank_name` and `account_names_are_case_sensitive` were written for the old `String` API. Those rules live in `AccountName` now, and its tests (mostly) cover them. One stub's doc still names `ACCOUNT_NAME_MAX_LEN`. Delete them, or rewrite them as tests of what `Ledger` itself still promises.
+- [ ] **Nits:** `post` looks the account up twice (`balance`, then `get_mut`). `rejects_whitespace` actually tests `Empty`, so the name is off. `crate::tests` (the helper module) shares a name with every `mod tests`. Lowercasing before the length check can change the char count for some non-ASCII letters (Turkish `İ` becomes two chars), which is an edge case worth knowing exists.
 
 ## Decisions
 
 Record each one with the reason, so it doesn't get re-litigated.
 
+- Account names are case-insensitive: `AccountName` trims and lowercases once, at parse, so every method sees one canonical form.
+- Commands reject extra arguments (`TooManyArguments`) rather than ignoring them.
+- `Ledger` takes plain types: `AccountName` by value where it stores, `&AccountName` where it only looks.
+- Help is a `const` table, not methods on `Command`. Trade-off accepted: nothing forces a new command to get a help row.
+- Test style: tables with `"input = {str:?}"` in the message, actual value first in `assert_eq!`, `.parse()` with a typed `let` and the turbofish only inside asserts.
+
 ## Gotchas
 
 ## Status by phase
 
-- [ ] P0 A list of amounts and a sum (working REPL with create; tests, writer injection and the open bugs left)
+- [ ] P0 A list of amounts and a sum (working REPL; open bugs, ignored stubs and docs left)
 - [ ] P1 Double entry
 - [ ] P2 Money and accounts as real types
 - [ ] P3 Reversals and idempotency
