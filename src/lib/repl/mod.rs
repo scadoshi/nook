@@ -1,78 +1,97 @@
 mod command;
 
-use std::process::ExitCode;
+use std::io::{BufRead, Write};
 
-use crate::ledger::Ledger;
+use thiserror::Error;
 
-fn help() {
-    println!("post <account> <int>");
-    println!("balance <account>");
+use crate::{
+    ledger::Ledger,
+    repl::command::{Command, error::InvalidCommand},
+};
+
+fn indent(n: usize) {
+    print!("{}", " ".repeat(n));
+}
+
+#[derive(Debug, Error)]
+pub enum ReplError {
+    #[error(transparent)]
+    Command(#[from] InvalidCommand),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("disconnected")]
+    Disconnected,
 }
 
 #[derive(Debug)]
-pub struct State {
+pub struct Repl<R> {
     ledger: Ledger,
+    reader: R,
 }
 
-impl State {
-    fn parse_command() {}
+fn print_hint() {
+    let commands = [
+        Command::Help,
+        Command::Post {
+            account: "".into(),
+            amount: 0,
+        },
+        Command::Balance { account: "".into() },
+        Command::Clear,
+        Command::Exit,
+    ];
+    let longest = commands
+        .iter()
+        .map(|c| c.help_example().len())
+        .max()
+        .unwrap_or(0);
+    println!("commands:");
+    for command in commands.iter() {
+        let example = command.help_example();
+        let space = longest.abs_diff(example.len()) + 5;
+        indent(2);
+        print!("{}", command.help_example());
+        indent(space);
+        println!("{}", command.help_message());
+    }
 }
 
-pub fn run() -> ExitCode {
-    help();
-    let mut ledger = Ledger::new();
-    let mut input = String::new();
+impl<R: BufRead> Repl<R> {
+    pub fn new(reader: R) -> Self {
+        Self {
+            reader,
+            ledger: Ledger::new(),
+        }
+    }
 
-    loop {
-        input.clear();
-        std::io::stdin().read_line(&mut input).unwrap();
-        input = input.trim().to_lowercase();
+    fn get_command(&mut self) -> Result<Command, ReplError> {
+        let mut buf = String::new();
+        if self.reader.read_line(&mut buf)? == 0 {
+            return Err(ReplError::Disconnected);
+        }
+        let command: Command = buf.parse()?;
+        Ok(command)
+    }
 
-        let mut parts = input.split_whitespace();
-        let Some(command) = parts.next() else {
-            println!("no command given");
-            continue;
-        };
-
-        match command {
-            "help" => help(),
-
-            "post" => {
-                let Some(account) = parts.next() else {
-                    println!("no account given");
-                    continue;
-                };
-                let Some(amount) = parts.next() else {
-                    println!("no amount given");
-                    continue;
-                };
-                match amount.parse::<i32>() {
-                    Ok(amount) => {
-                        ledger.post(account, amount);
-                        println!("posted {amount} dollars to {account}");
-                    }
-                    Err(e) => println!("failed to parse amount: {e}"),
+    pub fn run(&mut self) -> Result<(), ReplError> {
+        print_hint();
+        loop {
+            match self.get_command() {
+                Ok(Command::Help) => print_hint(),
+                Ok(Command::Post { account, amount }) => {
+                    self.ledger.post(account.clone(), amount);
+                    println!("posted {amount} dollars to {account}");
                 }
-            }
-
-            "balance" => {
-                let Some(account) = parts.next() else {
-                    println!("no account given");
-                    continue;
-                };
-                println!("{account} has {} dollars", ledger.balance(account));
-            }
-
-            "exit" => {
-                println!("thank you goodbye");
-                return ExitCode::SUCCESS;
-            }
-
-            _ => {
-                println!("invalid input");
+                Ok(Command::Balance { account }) => {
+                    println!("{account} has {} dollars", self.ledger.balance(&account))
+                }
+                Ok(Command::Clear) => {
+                    print!("\x1B[2J\x1B[1;1H");
+                    std::io::stdout().flush()?;
+                }
+                Ok(Command::Exit) => return Ok(()),
+                Err(e) => println!("{e}"),
             }
         }
-
-        input.clear();
     }
 }

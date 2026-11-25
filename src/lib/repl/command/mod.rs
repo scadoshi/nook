@@ -2,13 +2,14 @@ use std::str::FromStr;
 
 use crate::repl::command::error::{InvalidBalance, InvalidCommand, InvalidPost};
 
-mod error;
+pub mod error;
 
 #[derive(Debug, Clone)]
 pub enum Command {
     Help,
     Post { account: String, amount: i32 },
     Balance { account: String },
+    Clear,
     Exit,
 }
 
@@ -16,14 +17,34 @@ impl Command {
     pub fn account(&self) -> Option<&str> {
         match self {
             Self::Post { account, .. } | Self::Balance { account } => Some(account),
-            Self::Help | Self::Exit => None,
+            Self::Help | Self::Clear | Self::Exit => None,
         }
     }
 
     pub fn amount(&self) -> Option<i32> {
         match self {
             Self::Post { amount, .. } => Some(*amount),
-            Self::Help | Self::Balance { .. } | Self::Exit => None,
+            Self::Help | Self::Balance { .. } | Self::Clear | Self::Exit => None,
+        }
+    }
+
+    pub fn help_example(&self) -> &'static str {
+        match self {
+            Self::Help => "help",
+            Self::Post { .. } => "post <account> <amount>",
+            Self::Balance { .. } => "balance <account>",
+            Self::Clear => "clear",
+            Self::Exit => "exit",
+        }
+    }
+
+    pub fn help_message(&self) -> &'static str {
+        match self {
+            Self::Help => "show this message",
+            Self::Post { .. } => "add an amount to an account",
+            Self::Balance { .. } => "show an account's balance",
+            Self::Clear => "clear the console",
+            Self::Exit => "quit",
         }
     }
 }
@@ -57,6 +78,7 @@ impl FromStr for Command {
                 };
                 Self::Balance { account }
             }
+            "clear" => Self::Clear,
             "exit" => Self::Exit,
             _ => return Err(InvalidCommand::Unrecognized),
         })
