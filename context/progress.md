@@ -16,11 +16,11 @@ Where the project actually is: phase status, decisions made, gotchas surfaced, w
 
 Found behavior only. The fixes are his to write.
 
-- **End of input loops forever.** Pipe a few commands in, or press Ctrl-D: once `read_line` returns 0, `get_command` returns `Disconnected`, `run` prints it and loops, and it prints `disconnected` forever. Hint: which `ReplError`s should be shown to the user, and which should end `run`? An I/O error from `read_line` takes the same path.
-- **Commands are case sensitive now.** `POST bob 3` is "unrecognized command". The first REPL lowercased its input; the `FromStr` one doesn't. Decide on purpose: commands case-insensitive, but account names?
-- **A balance can overflow.** `post a 2147483647` twice, then `balance a`: `sum()` over `i32` panics in a debug build and wraps in release. That's the P0 lesson pointing at P2 (checked math, an `Amount` type).
-- **Clippy:** `Command::account` and `Command::amount` are only used in tests, so they warn as dead code outside them.
-- **Nit, naming:** `InvalidPost::MissingAccount` and `InvalidBalance::Account` are the same failure under two names. Pick one and use it in both.
+- [x] **End of input loops forever.** Pipe a few commands in, or press Ctrl-D: once `read_line` returns 0, `get_command` returns `Disconnected`, `run` prints it and loops, and it prints `disconnected` forever. Hint: which `ReplError`s should be shown to the user, and which should end `run`? An I/O error from `read_line` takes the same path.
+- [x] **Commands are case sensitive now.** `POST bob 3` is "unrecognized command". The first REPL lowercased its input; the `FromStr` one doesn't. Decide on purpose: commands case-insensitive, but account names?
+- [x] **A balance can overflow.** `post a 2147483647` twice, then `balance a`: `sum()` over `i32` panics in a debug build and wraps in release. That's the P0 lesson pointing at P2 (checked math, an `Amount` type).
+- [x] **Clippy:** `Command::account` and `Command::amount` are only used in tests, so they warn as dead code outside them.
+- [x] **Nit, naming:** `InvalidPost::MissingAccount` and `InvalidBalance::Account` are the same failure under two names. Pick one and use it in both.
 
 ## Decisions
 

@@ -13,6 +13,8 @@ pub enum Command {
 }
 
 impl Command {
+    // dead code for now but will use eventually
+    #[cfg(test)]
     pub fn account(&self) -> Option<&str> {
         match self {
             Self::Post { account, .. } | Self::Balance { account } => Some(account),
@@ -20,6 +22,8 @@ impl Command {
         }
     }
 
+    // dead code for now but will use eventually
+    #[cfg(test)]
     pub fn amount(&self) -> Option<i32> {
         match self {
             Self::Post { amount, .. } => Some(*amount),
