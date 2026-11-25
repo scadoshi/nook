@@ -89,7 +89,7 @@ impl<R: BufRead> Repl<R> {
                     print!("\x1B[2J\x1B[1;1H");
                     std::io::stdout().flush()?;
                 }
-                Ok(Command::Exit) => return Ok(()),
+                Ok(Command::Exit) | Err(ReplError::Disconnected) => return Ok(()),
                 Err(e) => println!("{e}"),
             }
         }
