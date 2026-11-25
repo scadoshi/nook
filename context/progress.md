@@ -20,6 +20,7 @@ Found behavior only. The fixes are his to write.
 - **Commands are case sensitive now.** `POST bob 3` is "unrecognized command". The first REPL lowercased its input; the `FromStr` one doesn't. Decide on purpose: commands case-insensitive, but account names?
 - **A balance can overflow.** `post a 2147483647` twice, then `balance a`: `sum()` over `i32` panics in a debug build and wraps in release. That's the P0 lesson pointing at P2 (checked math, an `Amount` type).
 - **Clippy:** `Command::account` and `Command::amount` are only used in tests, so they warn as dead code outside them.
+- **Nit, naming:** `InvalidPost::MissingAccount` and `InvalidBalance::Account` are the same failure under two names. Pick one and use it in both.
 
 ## Decisions
 
