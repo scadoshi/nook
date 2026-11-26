@@ -6,7 +6,7 @@ Where the project actually is: phase status, decisions made, gotchas surfaced, w
 
 **P0 working, as of 2026-11-25 (late).** A per-account ledger (`HashMap<AccountName, Vec<i32>>`, balance summed on every read) behind a REPL. Files: `ledger/mod.rs` (`Ledger`, `CreateError`, `PostError`, `BalanceError`) and `ledger/account_name.rs`. `AccountName` is a newtype built only through `FromStr`: it trims, lowercases, and rejects empty names, names over 64 chars, and names with inner whitespace. `Command` parses case-insensitively into one `ParseCommandError` (empty, unrecognized, missing or extra arguments, a bad int, a bad account name). `Repl<R: BufRead, W: Write>` reads and writes through injected handles; `main` passes stdin and stdout. Help comes from a `const HELP` table of `HelpEntry { example, message }`. The scadoshi-rust lints, `clippy.toml` and `rustfmt.toml` are in place.
 
-22 tests pass, 16 are ignored stubs (the two label stubs can be filled in now), fmt is clean. Clippy: no errors; the warnings are docs (deferred) plus the few bugs below. 
+22 tests pass, 18 are ignored stubs (the two label stubs can be filled in now), fmt is clean. Clippy: no errors; the warnings are docs (deferred) plus the few bugs below. 
 
 **Next:**
 - Chip away at the open bugs below.
@@ -22,8 +22,8 @@ Fixed so far: the end-of-input loop, case-sensitive commands, balance overflow, 
 
 Open, found 2026-11-25 after `AccountName` and the help table:
 
-- [ ] **A reader that keeps erroring loops forever.** An I/O error from `read_line` falls into the `Err(e)` arm, gets printed, and the loop reads again. Same shape as the old disconnect bug. Hint: which `ReplError` variants should `run` show and continue on, and which should end it?
-- [ ] **The missing-argument name doesn't match help.** Help says `<account name>`; the error says `missing argument: <account>`.
+- [ ] **A reader that keeps erroring loops forever.** Fix is in (uncommitted): `run` matches `Err(e @ ReplError::Io(..))` and returns it, and shows and continues on `Err(e @ ReplError::Command(..))`. EOF was never part of this; `get_command` maps `Ok(0)` to `Exit`. Left: fill in `run_returns_reader_io_error` and `run_returns_writer_io_error`. Each needs a small test-only type, one implementing `BufRead` whose read always errors, one implementing `Write` whose write always errors. Assert `run` returns `Err(ReplError::Io(..))`. Check it off once the reader test passes.
+- [ ] **The missing-argument name doesn't match help.** Code fixed (now `account name`), but `missing_arguments` still expects `MissingArg("account")` in its table, so that test fails. Update the expected values, then check this off.
 - [ ] **Error messages read unevenly.** `Empty` says "account name cannot be empty", but `ExceedsMaxLength` and `IncludesWhitespace` drop the subject ("cannot exceed 64 chars"). Parse errors print bare while ledger errors get a `create error:` style prefix. A blank line prints "input was empty"; most REPLs just show the prompt again. Negative amounts read "posted -1 dollars"; fine, but decide on purpose.
 - [ ] **Clippy, small:** `get_mut(&account_name)` in `post` borrows something that's already a reference; `Command` is `pub` but never leaves the crate (`unreachable_pub` wants `pub(super)`); `main`'s `eprintln!` wants an `#[expect]` with a reason, since it's the CLI's own output.
 - [ ] **`Deref` on `AccountName`.** The guide keeps `Deref` for smart pointers. The `&*account_name` in every `writeln!` is the symptom. What would let you write `{account_name}` directly?

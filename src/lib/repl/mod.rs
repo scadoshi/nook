@@ -93,7 +93,8 @@ impl<R: BufRead, W: Write> Repl<R, W> {
                     Err(e) => writeln!(self.writer, "balance error: {e}")?,
                 },
                 Ok(Command::Exit) => return Ok(()),
-                Err(e) => writeln!(self.writer, "{e}")?,
+                Err(e @ ReplError::Io(..)) => return Err(e),
+                Err(e @ ReplError::Command(..)) => writeln!(self.writer, "{e}")?,
             }
             self.writer.flush()?;
         }
@@ -143,4 +144,14 @@ mod tests {
     #[test]
     #[ignore = "stub, not written yet"]
     fn run_help_goes_to_writer() {}
+
+    /// A reader whose read always fails: run returns Err(ReplError::Io(..)) instead of looping forever.
+    #[test]
+    #[ignore = "stub, not written yet"]
+    fn run_returns_reader_io_error() {}
+
+    /// A writer whose write always fails: run returns Err(ReplError::Io(..)) on the startup hint.
+    #[test]
+    #[ignore = "stub, not written yet"]
+    fn run_returns_writer_io_error() {}
 }

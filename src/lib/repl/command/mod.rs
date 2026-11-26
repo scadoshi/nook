@@ -87,7 +87,7 @@ impl FromStr for Command {
             "create" => {
                 let account_name = parts
                     .next()
-                    .ok_or_else(|| ParseCommandError::MissingArg("account".into()))
+                    .ok_or_else(|| ParseCommandError::MissingArg("account name".into()))
                     .map(AccountName::from_str)??;
                 if parts.next().is_some() {
                     return Err(ParseCommandError::TooManyArguments);
@@ -97,7 +97,7 @@ impl FromStr for Command {
             "post" => {
                 let account_name = parts
                     .next()
-                    .ok_or_else(|| ParseCommandError::MissingArg("account".into()))
+                    .ok_or_else(|| ParseCommandError::MissingArg("account name".into()))
                     .map(AccountName::from_str)??;
                 let amount: i32 = parts
                     .next()
@@ -115,7 +115,7 @@ impl FromStr for Command {
             "balance" => {
                 let account_name = parts
                     .next()
-                    .ok_or_else(|| ParseCommandError::MissingArg("account".into()))
+                    .ok_or_else(|| ParseCommandError::MissingArg("account name".into()))
                     .map(AccountName::from_str)??;
                 if parts.next().is_some() {
                     return Err(ParseCommandError::TooManyArguments);
