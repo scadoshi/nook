@@ -209,7 +209,7 @@ mod tests {
     #[test]
     fn missing_arguments() {
         let cases = vec![
-            ("account", vec!["create", "post", "balance"]),
+            ("account name", vec!["create", "post", "balance"]),
             ("amount", vec!["post foo"]),
         ];
         for (expected, cases) in cases {
